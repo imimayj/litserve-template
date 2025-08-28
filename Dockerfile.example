@@ -1,0 +1,58 @@
+# 🏗️ BUILD STAGE: Install Dependencies & Build Wheel
+FROM python:3.12-slim AS builder
+
+# Install system dependencies & PDM
+#RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN pip install --upgrade pip requests cachecontrol
+RUN pip install --no-cache-dir pdm "mlflow>=2.7.0" google-cloud-storage
+WORKDIR /app
+
+# Copy service account credentials
+COPY your_credz.json /root/your_creds.json
+ENV YOUR_CLOUD_CREDENTIALS=/root/your_creds.json
+
+# MLflow Model Download
+ARG MLFLOW_STORAGE_URL
+ARG MLFLOW_TRACKING_URI
+ARG MLFLOW_MODEL_URI
+RUN mlflow artifacts download --artifact-uri ${MLFLOW_MODEL_URI} -d /app/models/mlflow-models
+
+# Copy project files
+COPY pyproject.toml uv.lock README.md /app/
+COPY ./litserve /app/src/litserve
+
+# Export dependencies to `requirements.txt` and install them
+# RUN pdm export --prod --without-hashes -o requirements.txt && \ 
+#     pip install --no-cache-dir -r requirements.txt
+RUN pdm config python.use_venv true && \
+    pdm install --prod --no-editable --check 
+
+RUN pdm build
+
+# FINAL STAGE: Run the Application
+FROM python:3.12-slim AS runner
+WORKDIR /app
+
+# copy virtualenv
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Copy built application from the builder stage
+COPY --from=builder /app/dist/*.whl /app/
+COPY --from=builder /app/src/ /app/src/
+COPY --from=builder /app/models/mlflow-models /app/models/mlflow-models/
+
+# Install dependencies from the built wheel
+# COPY --from=builder /app/requirements.txt /app/
+# RUN pip install --no-cache-dir -r requirements.txt
+
+# Set Environment Variables
+ENV LOG_REQUEST_IDS=true
+ENV MLFLOW_MODEL_PATH=/app/models/mlflow-models/model
+ENV ENABLE_METRICS=true
+ENV PYTHONPATH=/app/src
+
+# Expose port 80 for the API
+EXPOSE 80
+
+CMD ["python", "-m", "litserve.entrypoint"]

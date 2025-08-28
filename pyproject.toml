@@ -1,0 +1,20 @@
+[project]
+name = "litserve-template"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "contractions>=0.1.73",
+    "litserve>=0.2.15",
+    "mlflow>=3.3.2",
+    "prometheus-client>=0.22.1",
+    "pydantic>=2.11.7",
+    "requests>=2.32.5",
+    "torch>=2.8.0",
+    "torchaudio>=2.8.0",
+    "torchvision>=0.23.0",
+    "transformers>=4.55.4",
+    "unidecode>=1.4.0",
+    "uvicorn>=0.35.0",
+]
